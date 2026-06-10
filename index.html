@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate 3D High-End Racing</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        #troll-warning {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 0, 0, 0.8); color: white; padding: 12px 24px;
+            font-size: 20px; font-weight: bold; border-radius: 8px; display: none;
+            box-shadow: 0 0 20px #ff0000; text-transform: uppercase; letter-spacing: 2px;
+        }
+        #ui {
+            position: absolute; bottom: 20px; left: 20px; color: white;
+            font-size: 18px; text-shadow: 2px 2px 4px #000; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="troll-warning">⚠️ CONTROLS REVERSED! GOOD LUCK! ⚠️</div>
+    <div id="ui">Use WASD or Arrows to drive. Space to Drift.</div>
+    <div id="canvas-container"></div>
+
+    <!-- Import Three.js Engine via CDN -->
+    <script src="https://cloudflare.com"></script>
+
+    <script>
+        // --- 1. SETUP ENGINE AND HIGH-END GRAPHICS ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x1a1a2e, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        // --- 2. ADVANCED LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffaa44, 1.5);
+        sunLight.position.set(50, 40, 30);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        const d = 40;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        scene.add(sunLight);
+
+        // --- 3. CREATE TRACK AND ENVIRONMENT ---
+        const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.2, metalness: 0.8 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const gridHelper = new THREE.GridHelper(1000, 200, 0x00ffff, 0x444444);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
+
+        const towerGeo = new THREE.BoxGeometry(10, 50, 10);
+        const towerMat = new THREE.MeshStandardMaterial({ color: 0xff0055, roughness: 0.1, metalness: 0.9 });
+        for(let i=0; i<30; i++) {
+            const tower = new THREE.Mesh(towerGeo, towerMat);
+            tower.position.set((Math.random() - 0.5) * 300, 25, (Math.random() - 0.5) * 300);
+            tower.castShadow = true;
+            tower.receiveShadow = true;
+            scene.add(tower);
+        }
+
+        // --- 4. BUILD THE CAR ---
+        const carGroup = new THREE.Group();
+        scene.add(carGroup);
+
+        const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0x00ffcc, metalness: 0.9, roughness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.1
+        });
+
+        const mainBody = new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 4.5), bodyMat);
+        mainBody.position.y = 0.5;
+        mainBody.castShadow = true;
+        carGroup.add(mainBody);
+
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 2), new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.1}));
+        cabin.position.set(0, 1.1, -0.2);
+        cabin.castShadow = true;
+        carGroup.add(cabin);
+
+        const underglow = new THREE.PointLight(0x00ffcc, 2, 8);
+        underglow.position.set(0, 0.1, 0);
+        carGroup.add(underglow);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+        const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 24);
+        wheelGeo.rotateZ(Math.PI / 2);
+
+        const wheels = [];
+        const wheelPositions = [
+            [-1, 0.4, 1.4], [1, 0.4, 1.4], [-1, 0.4, -1.4], [1, 0.4, -1.4]
+        ];
+
+        wheelPositions.forEach(pos => {
+            const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+            wheel.position.set(pos[0], pos[1], pos[2]);
+            wheel.castShadow = true;
+            carGroup.add(wheel);
+            wheels.push(wheel);
+        });
+
+        // --- 5. CAR PHYSICS & PRANK LOGIC VARIABLES ---
+        let carPhysics = {
+            speed: 0, maxSpeed: 1.2, acceleration: 0.04, deceleration: 0.02, angle: 0, steeringSpeed: 0.04
+        };
+
+        let keys = { w: false, a: false, s: false, d: false, space: false };
+        let controlMultiplier = 1.0; 
+
+        const keyMap = (e, isPressed) => {
+            if (e.key === 'w' || e.key === 'ArrowUp') keys.w = isPressed;
+            if (e.key === 's' || e.key === 'ArrowDown') keys.s = isPressed;
+            if (e.key === 'a' || e.key === 'ArrowLeft') keys.a = isPressed;
+            if (e.key === 'd' || e.key === 'ArrowRight') keys.d = isPressed;
+            if (e.key === ' ') keys.space = isPressed;
+        };
+        window.addEventListener('keydown', (e) => keyMap(e, true));
+        window.addEventListener('keyup', (e) => keyMap(e, false));
+
+        // THE TROLL ENGINE: Every 7 seconds, randomly invert steering
+        const warningUI = document.getElementById('troll-warning');
+        setInterval(() => {
+            if(Math.random() > 0.5) {
+                controlMultiplier = -1.0; 
+                warningUI.style.display = 'block';
+            } else {
+                controlMultiplier = 1.0;
+                warningUI.style.display = 'none';
+            }
+        }, 7000);
+
+        // --- 6. GAME ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (keys.w) {
+                carPhysics.speed = Math.min(carPhysics.speed + carPhysics.acceleration, carPhysics.maxSpeed);
+            } else if (keys.s) {
+                carPhysics.speed = Math.max(carPhysics.speed - carPhysics.acceleration, -carPhysics.maxSpeed/2);
+            } else {
+                if (carPhysics.speed > 0) carPhysics.speed = Math.max(0, carPhysics.speed - carPhysics.deceleration);
+                if (carPhysics.speed < 0) carPhysics.speed = Math.min(0, carPhysics.speed + carPhysics.deceleration);
+            }
+
+            let currentSteerSpeed = carPhysics.steeringSpeed;
+            if (keys.space && Math.abs(carPhysics.speed) > 0.1) {
+                currentSteerSpeed *= 1.8;
+                carPhysics.speed *= 0.97;
+            }
+
+            if (Math.abs(carPhysics.speed) > 0.05) {
+                const directionModifier = carPhysics.speed > 0 ? 1 : -1;
+                if (keys.a) carPhysics.angle += currentSteerSpeed * controlMultiplier * directionModifier;
+                if (keys.d) carPhysics.angle -= currentSteerSpeed * controlMultiplier * directionModifier;
+            }
+
+            carGroup.position.x += Math.sin(carPhysics.angle) * carPhysics.speed;
+            carGroup.position.z += Math.cos(carPhysics.angle) * carPhysics.speed;
+            carGroup.rotation.y = carPhysics.angle;
+
+            wheels.forEach(w => w.rotation.x += carPhysics.speed * 0.5);
+
+            // --- 7. CINEMATIC SMOOTH CAMERA TRACKING ---
+            const targetCamY = carGroup.position.y + 3.5;
+            const targetCamX = carGroup.position.x - Math.sin(carPhysics.angle) * 9;
+            const targetCamZ = carGroup.position.z - Math.cos(carPhysics.angle) * 9;
+
+            camera.position.x += (targetCamX - camera.position.x) * 0.1;
+            camera.position.y += (targetCamY - camera.position.y) * 0.1;
+            camera.position.z += (targetCamZ - camera.position.z) * 0.1;
+            camera.lookAt(carGroup.position.x, carGroup.position.y + 0.5, carGroup.position.z);
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
