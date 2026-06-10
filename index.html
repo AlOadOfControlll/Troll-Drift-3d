@@ -3,204 +3,293 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate 3D High-End Racing</title>
+    <title>Troll Drift 3D</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #canvas-container { width: 100vw; height: 100vh; }
-        #troll-warning {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(255, 0, 0, 0.8); color: white; padding: 12px 24px;
-            font-size: 20px; font-weight: bold; border-radius: 8px; display: none;
-            box-shadow: 0 0 20px #ff0000; text-transform: uppercase; letter-spacing: 2px;
-        }
-        #ui {
-            position: absolute; bottom: 20px; left: 20px; color: white;
-            font-size: 18px; text-shadow: 2px 2px 4px #000; pointer-events: none;
-        }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #050510; font-family: 'Segoe UI', sans-serif; user-select: none; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top:0; left:0; z-index: 1; display: none; }
+        .ui-screen { position: absolute; top:0; left:0; width: 100vw; height:100vh; z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(5,5,20,0.85); color: white; }
+        #splash-screen { background: #050510; z-index: 20; }
+        #main-menu { display: none; background: radial-gradient(circle, #1a1a3a 0%, #050515 100%); }
+        #shop-menu, #settings-menu { display: none; }
+        title-text { font-size: 60px; font-weight: 900; text-transform: uppercase; letter-spacing: 4px; text-shadow: 0 0 30px #00ffcc; margin-bottom: 30px; }
+        h2 { font-size: 40px; margin-bottom: 20px; color: #00ffcc; }
+        .menu-btn { width: 220px; padding: 15px; margin: 10px; font-size: 18px; font-weight: bold; text-transform: uppercase; background: linear-gradient(45deg, #00ffcc, #0099ff); border: none; border-radius: 30px; color: #050510; cursor: pointer; transition: 0.2s; box-shadow: 0 5px 15px rgba(0,255,204,0.4); }
+        .menu-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,255,204,0.7); }
+        .back-btn { background: #ff0055; color: white; box-shadow: 0 5px 15px rgba(255,0,85,0.4); }
+        .back-btn:hover { box-shadow: 0 8px 25px rgba(255,0,85,0.7); }
+        #hud { position: absolute; top: 20px; left: 20px; z-index: 5; color: white; font-size: 26px; font-weight: bold; text-shadow: 2px 2px 4px #000; display: none; transition: transform 0.1s ease-out; }
+        #hud span { color: #ffcc00; text-shadow: 0 0 10px #ffcc00; }
+        #pause-btn { position: absolute; top: 20px; right: 20px; z-index: 5; width: 50px; height: 50px; background: rgba(255,255,255,0.2); border: 2px solid white; border-radius: 50%; color: white; font-size: 20px; cursor: pointer; display: none; justify-content: center; align-items: center; }
+        #troll-warning { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); z-index: 5; background: rgba(255, 0, 0, 0.9); color: white; padding: 12px 24px; font-size: 22px; font-weight: bold; border-radius: 8px; display: none; box-shadow: 0 0 25px #ff0000; animation: flashWarn 0.4s infinite alternate; }
+        @keyframes flashWarn { from { opacity: 0.6; } to { opacity: 1; } }
+        #ability-indicator { position: absolute; bottom: 30px; right: 30px; z-index: 5; color: #ffcc00; font-size: 20px; font-weight: bold; display: none; }
+        .grid { display: flex; gap: 20px; margin-bottom: 30px; }
+        .shop-item { background: rgba(255,255,255,0.05); border: 2px solid #00ffcc; padding: 20px; border-radius: 15px; text-align: center; width: 180px; }
+        .key-row { display: flex; justify-content: space-between; width: 300px; margin: 10px 0; font-size: 18px; background: rgba(255,255,255,0.05); padding: 10px 20px; border-radius: 8px; }
+        .key-btn { background: #333; border: 1px solid #666; color: #00ffcc; padding: 3px 10px; border-radius: 4px; cursor: pointer; min-width: 50px; text-align: center; }
+        
+        /* Floating pop up text style for coin collection */
+        .pop-text { position: absolute; color: #ffcc00; font-size: 24px; font-weight: 900; z-index: 6; pointer-events: none; text-shadow: 0 0 8px #ffcc00; animation: floatUp 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; }
+        @keyframes floatUp { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -120px) scale(1.3); opacity: 0; } }
     </style>
 </head>
 <body>
-
-    <div id="troll-warning">⚠️ CONTROLS REVERSED! GOOD LUCK! ⚠️</div>
-    <div id="ui">Use WASD or Arrows to drive. Space to Drift.</div>
+    <div id="splash-screen" class="ui-screen">
+        <title-text id="splash-title">Troll Drift 3D</title-text>
+    </div>
+    <div id="main-menu" class="ui-screen">
+        <title-text>Troll Drift 3D</title-text>
+        <button class="menu-btn" onclick="startGame()">Play</button>
+        <button class="menu-btn" onclick="openScreen('shop-menu')">Shop</button>
+        <button class="menu-btn" onclick="openScreen('settings-menu')">Settings</button>
+    </div>
+    <div id="shop-menu" class="ui-screen">
+        <h2>Shop & Abilities</h2>
+        <div style="font-size:20px; margin-bottom:20px;">Coins: <span id="shop-coins" style="color:#ffcc00">0</span></div>
+        <div class="grid">
+            <div class="shop-item" id="item-truck">
+                <h3>Cyber Truck</h3>
+                <button class="menu-btn" style="width:100%; margin:0;" onclick="buyItem('truck', 15)">15 Coins</button>
+            </div>
+            <div class="shop-item" id="item-shield">
+                <h3>Shield</h3>
+                <button class="menu-btn" style="width:100%; margin:0;" onclick="buyItem('shield', 5)">5 Coins</button>
+            </div>
+        </div>
+        <button class="menu-btn back-btn" onclick="openScreen('main-menu')">Back</button>
+    </div>
+    <div id="settings-menu" class="ui-screen">
+        <h2>Keybinds</h2>
+        <div class="key-row"><span>Forward:</span><div class="key-btn" id="bind-up" onclick="rebind('up')">W</div></div>
+        <div class="key-row"><span>Left:</span><div class="key-btn" id="bind-left" onclick="rebind('left')">A</div></div>
+        <div class="key-row"><span>Backward:</span><div class="key-btn" id="bind-down" onclick="rebind('down')">S</div></div>
+        <div class="key-row"><span>Right:</span><div class="key-btn" id="bind-right" onclick="rebind('right')">D</div></div>
+        <button class="menu-btn back-btn" onclick="openScreen('main-menu')">Back</button>
+    </div>
+    <div id="gameover-menu" class="ui-screen" style="display:none; background: rgba(30,5,10,0.95);">
+        <title-text style="color:#ff0055; font-size:70px;">WRECKED!</title-text>
+        <p style="font-size: 26px;">Score Multiplier Gained Coins: <span id="go-coins" style="color:#ffcc00">0</span></p>
+        <button class="menu-btn" onclick="startGame()">Instant Run</button>
+        <button class="menu-btn back-btn" onclick="openScreen('main-menu')">Main Menu</button>
+    </div>
+    <div id="hud">Coins: <span id="hud-coins">0</span></div>
+    <button id="pause-btn" onclick="togglePause()">⏸</button>
+    <div id="troll-warning">⚠️ CONTROLS REVERSED! ⚠️</div>
+    <div id="ability-indicator">🛡️ SHIELD (Press Shift to Use)</div>
     <div id="canvas-container"></div>
 
-    <!-- Import Three.js Engine via CDN -->
     <script src="https://cloudflare.com"></script>
-
     <script>
-        // --- 1. SETUP ENGINE AND HIGH-END GRAPHICS ---
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x1a1a2e, 0.015);
+        // Intro addictive splash sequence 
+        setTimeout(() => {
+            document.getElementById('splash-title').style.transform = "scale(1.4)";
+            document.getElementById('splash-title').style.transition = "transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)";
+            setTimeout(() => {
+                document.getElementById('splash-screen').style.opacity = '0';
+                document.getElementById('splash-screen').style.transition = 'opacity 0.5s';
+                setTimeout(() => {
+                    document.getElementById('splash-screen').style.display = 'none';
+                    document.getElementById('main-menu').style.display = 'flex';
+                }, 500);
+            }, 1000);
+        }, 1500);
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.2;
-        container.appendChild(renderer.domElement);
-
-        // --- 2. ADVANCED LIGHTING ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-        scene.add(ambientLight);
-
-        const sunLight = new THREE.DirectionalLight(0xffaa44, 1.5);
-        sunLight.position.set(50, 40, 30);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
-        const d = 40;
-        sunLight.shadow.camera.left = -d;
-        sunLight.shadow.camera.right = d;
-        sunLight.shadow.camera.top = d;
-        sunLight.shadow.camera.bottom = -d;
-        scene.add(sunLight);
-
-        // --- 3. CREATE TRACK AND ENVIRONMENT ---
-        const floorGeo = new THREE.PlaneGeometry(1000, 1000);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.2, metalness: 0.8 });
-        const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
-
-        const gridHelper = new THREE.GridHelper(1000, 200, 0x00ffff, 0x444444);
-        gridHelper.position.y = 0.01;
-        scene.add(gridHelper);
-
-        const towerGeo = new THREE.BoxGeometry(10, 50, 10);
-        const towerMat = new THREE.MeshStandardMaterial({ color: 0xff0055, roughness: 0.1, metalness: 0.9 });
-        for(let i=0; i<30; i++) {
-            const tower = new THREE.Mesh(towerGeo, towerMat);
-            tower.position.set((Math.random() - 0.5) * 300, 25, (Math.random() - 0.5) * 300);
-            tower.castShadow = true;
-            tower.receiveShadow = true;
-            scene.add(tower);
+        function openScreen(screenId) {
+            document.querySelectorAll('.ui-screen').forEach(s => s.style.display = 'none');
+            document.getElementById(screenId).style.display = 'flex';
+            document.getElementById('shop-coins').innerText = saveState.coins;
         }
 
-        // --- 4. BUILD THE CAR ---
-        const carGroup = new THREE.Group();
-        scene.add(carGroup);
+        let saveState = { coins: 0, unlockedTruck: false, hasShield: false, activeCar: 'default' };
+        let keybinds = { up: 'w', down: 's', left: 'a', right: 'd' };
+        let activeRebind = null;
 
-        const bodyMat = new THREE.MeshStandardMaterial({
-            color: 0x00ffcc, metalness: 0.9, roughness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.1
-        });
-
-        const mainBody = new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 4.5), bodyMat);
-        mainBody.position.y = 0.5;
-        mainBody.castShadow = true;
-        carGroup.add(mainBody);
-
-        const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 2), new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.1}));
-        cabin.position.set(0, 1.1, -0.2);
-        cabin.castShadow = true;
-        carGroup.add(cabin);
-
-        const underglow = new THREE.PointLight(0x00ffcc, 2, 8);
-        underglow.position.set(0, 0.1, 0);
-        carGroup.add(underglow);
-        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
-        const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 24);
-        wheelGeo.rotateZ(Math.PI / 2);
-
-        const wheels = [];
-        const wheelPositions = [
-            [-1, 0.4, 1.4], [1, 0.4, 1.4], [-1, 0.4, -1.4], [1, 0.4, -1.4]
-        ];
-
-        wheelPositions.forEach(pos => {
-            const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-            wheel.position.set(pos[0], pos[1], pos[2]);
-            wheel.castShadow = true;
-            carGroup.add(wheel);
-            wheels.push(wheel);
-        });
-
-        // --- 5. CAR PHYSICS & PRANK LOGIC VARIABLES ---
-        let carPhysics = {
-            speed: 0, maxSpeed: 1.2, acceleration: 0.04, deceleration: 0.02, angle: 0, steeringSpeed: 0.04
-        };
-
-        let keys = { w: false, a: false, s: false, d: false, space: false };
-        let controlMultiplier = 1.0; 
-
-        const keyMap = (e, isPressed) => {
-            if (e.key === 'w' || e.key === 'ArrowUp') keys.w = isPressed;
-            if (e.key === 's' || e.key === 'ArrowDown') keys.s = isPressed;
-            if (e.key === 'a' || e.key === 'ArrowLeft') keys.a = isPressed;
-            if (e.key === 'd' || e.key === 'ArrowRight') keys.d = isPressed;
-            if (e.key === ' ') keys.space = isPressed;
-        };
-        window.addEventListener('keydown', (e) => keyMap(e, true));
-        window.addEventListener('keyup', (e) => keyMap(e, false));
-
-        // THE TROLL ENGINE: Every 7 seconds, randomly invert steering
-        const warningUI = document.getElementById('troll-warning');
-        setInterval(() => {
-            if(Math.random() > 0.5) {
-                controlMultiplier = -1.0; 
-                warningUI.style.display = 'block';
-            } else {
-                controlMultiplier = 1.0;
-                warningUI.style.display = 'none';
+        function rebind(action) { activeRebind = action; document.getElementById(`bind-${action}`).innerText = '???'; }
+        window.addEventListener('keydown', (e) => {
+            if (activeRebind) {
+                keybinds[activeRebind] = e.key.toLowerCase();
+                document.getElementById(`bind-${activeRebind}`).innerText = e.key.toUpperCase();
+                activeRebind = null;
             }
-        }, 7000);
+        });
 
-        // --- 6. GAME ANIMATION LOOP ---
+        function buyItem(item, cost) {
+            if (saveState.coins >= cost) {
+                saveState.coins -= cost;
+                if(item === 'truck') { saveState.unlockedTruck = true; saveState.activeCar = 'truck'; }
+                if(item === 'shield') { saveState.hasShield = true; }
+                document.getElementById('shop-coins').innerText = saveState.coins;
+            }
+        }
+
+        let scene, camera, renderer, carGroup, isPlaying = false, isPaused = false;
+        let coinsCount = 0, controlMultiplier = 1.0, trollTimer = 0, entities = [];
+        let keys = { up: false, down: false, left: false, right: false };
+        let carPhysics = { speed: 0, maxSpeed: 1.4, acceleration: 0.04, deceleration: 0.02, angle: 0, steeringSpeed: 0.05, shielded: false };
+        let shakeIntensity = 0, trackGrid;
+
+        function initEngine() {
+            if (renderer) return;
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050515, 0.012);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            let sun = new THREE.DirectionalLight(0x00ffcc, 1.5); sun.position.set(20, 40, 20); scene.add(sun);
+            
+            // Cyber Grid track floor layout
+            let track = new THREE.Mesh(new THREE.PlaneGeometry(60, 4000), new THREE.MeshStandardMaterial({ color: 0x0a0a12, roughness: 0.3 }));
+            track.rotation.x = -Math.PI / 2; scene.add(track);
+            trackGrid = new THREE.GridHelper(2000, 100, 0x00ffcc, 0x222233);
+            trackGrid.position.y = 0.05; scene.add(trackGrid);
+        }
+        function spawnCarModel() {
+            if (carGroup) scene.remove(carGroup);
+            carGroup = new THREE.Group();
+            let isTruck = saveState.activeCar === 'truck';
+            let body = new THREE.Mesh(
+                isTruck ? new THREE.BoxGeometry(3, 1.6, 5.5) : new THREE.BoxGeometry(2.1, 0.8, 4.2),
+                new THREE.MeshStandardMaterial({ color: isTruck ? 0xff0055 : 0x00ffcc, metalness: 0.9, roughness: 0.1 })
+            );
+            body.position.y = isTruck ? 0.9 : 0.4;
+            carGroup.add(body);
+            scene.add(carGroup);
+        }
+
+        function triggerJuicyPopText(label) {
+            let el = document.createElement('div');
+            el.className = 'pop-text';
+            el.innerText = label;
+            el.style.left = (window.innerWidth / 2 + (Math.random() * 60 - 30)) + 'px';
+            el.style.top = (window.innerHeight / 2) + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 600);
+
+            // Pop scaling punch animation on HUD counter
+            let hud = document.getElementById('hud');
+            hud.style.transform = "scale(1.4)";
+            setTimeout(() => hud.style.transform = "scale(1)", 100);
+        }
+
+        function startGame() {
+            document.querySelectorAll('.ui-screen').forEach(s => s.style.display = 'none');
+            document.getElementById('canvas-container').style.display = 'block';
+            document.getElementById('hud').style.display = 'block';
+            document.getElementById('pause-btn').style.display = 'flex';
+            document.getElementById('ability-indicator').style.display = saveState.hasShield ? 'block' : 'none';
+            initEngine(); spawnCarModel();
+            carGroup.position.set(0, 0, 0); carPhysics.speed = 0; carPhysics.angle = 0; carPhysics.shielded = false;
+            coinsCount = 0; document.getElementById('hud-coins').innerText = "0";
+            entities.forEach(e => scene.remove(e.mesh)); entities = [];
+            isPlaying = true; isPaused = false;
+        }
+
+        function togglePause() { isPaused = !isPaused; document.getElementById('pause-btn').innerText = isPaused ? '▶' : '⏸'; }
+        
+        function gameOver() {
+            isPlaying = false; saveState.coins += coinsCount;
+            shakeIntensity = 0;
+            document.getElementById('canvas-container').style.display = 'none';
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('pause-btn').style.display = 'none';
+            document.getElementById('troll-warning').style.display = 'none';
+            document.getElementById('ability-indicator').style.display = 'none';
+            document.getElementById('go-coins').innerText = coinsCount;
+            document.getElementById('gameover-menu').style.display = 'flex';
+        }
+
+        window.addEventListener('keydown', (e) => {
+            let k = e.key.toLowerCase();
+            if (k === keybinds.up) keys.up = true; if (k === keybinds.down) keys.down = true;
+            if (k === keybinds.left) keys.left = true; if (k === keybinds.right) keys.right = true;
+            if (e.key === 'Shift' && saveState.hasShield && !carPhysics.shielded) {
+                saveState.hasShield = false; carPhysics.shielded = true;
+                document.getElementById('ability-indicator').style.display = 'none';
+                let shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(3.6, 12, 12), new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true }));
+                shieldMesh.name = "shieldVisual"; carGroup.add(shieldMesh);
+                shakeIntensity = 0.3; // Screen shock pop wave
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            let k = e.key.toLowerCase();
+            if (k === keybinds.up) keys.up = false; if (k === keybinds.down) keys.down = false;
+            if (k === keybinds.left) keys.left = false; if (k === keybinds.right) keys.right = false;
+        });
+
         function animate() {
             requestAnimationFrame(animate);
-
-            if (keys.w) {
-                carPhysics.speed = Math.min(carPhysics.speed + carPhysics.acceleration, carPhysics.maxSpeed);
-            } else if (keys.s) {
-                carPhysics.speed = Math.max(carPhysics.speed - carPhysics.acceleration, -carPhysics.maxSpeed/2);
-            } else {
-                if (carPhysics.speed > 0) carPhysics.speed = Math.max(0, carPhysics.speed - carPhysics.deceleration);
-                if (carPhysics.speed < 0) carPhysics.speed = Math.min(0, carPhysics.speed + carPhysics.deceleration);
+            if (!isPlaying || isPaused) return;
+            trollTimer++;
+            if (trollTimer % 300 === 0) {
+                controlMultiplier = Math.random() > 0.5 ? -1.0 : 1.0;
+                document.getElementById('troll-warning').style.display = controlMultiplier < 0 ? 'block' : 'none';
+                shakeIntensity = 0.4; // Screen rattle when glitch shifts up
             }
-
-            let currentSteerSpeed = carPhysics.steeringSpeed;
-            if (keys.space && Math.abs(carPhysics.speed) > 0.1) {
-                currentSteerSpeed *= 1.8;
-                carPhysics.speed *= 0.97;
-            }
-
-            if (Math.abs(carPhysics.speed) > 0.05) {
-                const directionModifier = carPhysics.speed > 0 ? 1 : -1;
-                if (keys.a) carPhysics.angle += currentSteerSpeed * controlMultiplier * directionModifier;
-                if (keys.d) carPhysics.angle -= currentSteerSpeed * controlMultiplier * directionModifier;
-            }
-
+            if (keys.up) carPhysics.speed = Math.min(carPhysics.speed + carPhysics.acceleration, carPhysics.maxSpeed);
+            else if (keys.down) carPhysics.speed = Math.max(carPhysics.speed - carPhysics.acceleration, -carPhysics.maxSpeed / 2);
+            else carPhysics.speed *= 0.95;
+            if (keys.left) carPhysics.angle += carPhysics.steeringSpeed * controlMultiplier;
+            if (keys.right) carPhysics.angle -= carPhysics.steeringSpeed * controlMultiplier;
+            
             carGroup.position.x += Math.sin(carPhysics.angle) * carPhysics.speed;
-            carGroup.position.z += Math.cos(carPhysics.angle) * carPhysics.speed;
+            carGroup.position.z -= Math.cos(carPhysics.angle) * carPhysics.speed;
             carGroup.rotation.y = carPhysics.angle;
+            if (carGroup.position.x > 27) { carGroup.position.x = 27; shakeIntensity = 0.1; } 
+            if (carGroup.position.x < -27) { carGroup.position.x = -27; shakeIntensity = 0.1; }
 
-            wheels.forEach(w => w.rotation.x += carPhysics.speed * 0.5);
+            // Dynamic grid colors matching speed hype
+            if(trackGrid) trackGrid.material.color.setHex(carPhysics.speed > 1.1 ? 0xff00ff : 0x00ffcc);
 
-            // --- 7. CINEMATIC SMOOTH CAMERA TRACKING ---
-            const targetCamY = carGroup.position.y + 3.5;
-            const targetCamX = carGroup.position.x - Math.sin(carPhysics.angle) * 9;
-            const targetCamZ = carGroup.position.z - Math.cos(carPhysics.angle) * 9;
+            if (Math.random() < 0.05) {
+                let isCoin = Math.random() > 0.35;
+                let mesh = new THREE.Mesh(
+                    isCoin ? new THREE.CylinderGeometry(0.8, 0.8, 0.3, 8) : new THREE.BoxGeometry(3.6, 2, 6),
+                    new THREE.MeshStandardMaterial({ color: isCoin ? 0xffcc00 : 0xff2255, metalness: 0.5 })
+                );
+                if(isCoin) mesh.rotation.x = Math.PI/2;
+                mesh.position.set((Math.random() - 0.5) * 52, 1, carGroup.position.z - 240);
+                scene.add(mesh); entities.push({ mesh: mesh, isCoin: isCoin });
+            }
 
-            camera.position.x += (targetCamX - camera.position.x) * 0.1;
-            camera.position.y += (targetCamY - camera.position.y) * 0.1;
-            camera.position.z += (targetCamZ - camera.position.z) * 0.1;
-            camera.lookAt(carGroup.position.x, carGroup.position.y + 0.5, carGroup.position.z);
+            for (let i = entities.length - 1; i >= 0; i--) {
+                let ent = entities[i];
+                if (!ent.isCoin) ent.mesh.position.z += 0.5; // High speed car traffic flow
+                else ent.mesh.rotation.y += 0.05; // Spin individual collectible coins smoothly
 
+                if (carGroup.position.distanceTo(ent.mesh.position) < 3.4) {
+                    scene.remove(ent.mesh); entities.splice(i, 1);
+                    if (ent.isCoin) { 
+                        coinsCount++; 
+                        document.getElementById('hud-coins').innerText = coinsCount;
+                        triggerJuicyPopText("+1 COIN!");
+                        shakeIntensity = 0.15;
+                    } 
+                    else {
+                        if (carPhysics.shielded) {
+                            carPhysics.shielded = false;
+                            shakeIntensity = 0.8;
+                            let v = carGroup.getObjectByName("shieldVisual"); if(v) carGroup.remove(v);
+                            triggerJuicyPopText("SHIELD BROKEN!");
+                        } else { gameOver(); }
+                    }
+                    continue;
+                }
+                if (ent.mesh.position.z > carGroup.position.z + 40) { scene.remove(ent.mesh); entities.splice(i, 1); }
+            }
+
+            // High juice screen camera vibration formulas
+            let shakeX = (Math.random() - 0.5) * shakeIntensity;
+            let shakeY = (Math.random() - 0.5) * shakeIntensity;
+            shakeIntensity *= 0.9; // Smoothly damp out camera vibrations
+
+            camera.position.set(carGroup.position.x + shakeX, carGroup.position.y + 5.2 + shakeY, carGroup.position.z + 14);
+            camera.lookAt(carGroup.position.x, carGroup.position.y + 0.5, carGroup.position.z - 5);
             renderer.render(scene, camera);
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        animate();
+        setInterval(animate, 1000 / 60);
     </script>
 </body>
 </html>
