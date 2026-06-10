@@ -10,7 +10,8 @@
         .ui-screen { position: absolute; top:0; left:0; width: 100vw; height:100vh; z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(5,5,20,0.85); color: white; }
         #splash-screen { background: #050510; z-index: 20; }
         #main-menu { display: none; background: radial-gradient(circle, #1a1a3a 0%, #050515 100%); }
-        #shop-menu, #settings-menu { display: none; }
+        #shop-menu, #settings-menu, #pause-menu { display: none; }
+        #pause-menu { background: rgba(5,5,20,0.9); z-index: 15; }
         title-text { font-size: 60px; font-weight: 900; text-transform: uppercase; letter-spacing: 4px; text-shadow: 0 0 30px #00ffcc; margin-bottom: 30px; }
         h2 { font-size: 40px; margin-bottom: 20px; color: #00ffcc; }
         .menu-btn { width: 220px; padding: 15px; margin: 10px; font-size: 18px; font-weight: bold; text-transform: uppercase; background: linear-gradient(45deg, #00ffcc, #0099ff); border: none; border-radius: 30px; color: #050510; cursor: pointer; transition: 0.2s; box-shadow: 0 5px 15px rgba(0,255,204,0.4); }
@@ -27,8 +28,6 @@
         .shop-item { background: rgba(255,255,255,0.05); border: 2px solid #00ffcc; padding: 20px; border-radius: 15px; text-align: center; width: 180px; }
         .key-row { display: flex; justify-content: space-between; width: 300px; margin: 10px 0; font-size: 18px; background: rgba(255,255,255,0.05); padding: 10px 20px; border-radius: 8px; }
         .key-btn { background: #333; border: 1px solid #666; color: #00ffcc; padding: 3px 10px; border-radius: 4px; cursor: pointer; min-width: 50px; text-align: center; }
-        
-        /* Floating pop up text style for coin collection */
         .pop-text { position: absolute; color: #ffcc00; font-size: 24px; font-weight: 900; z-index: 6; pointer-events: none; text-shadow: 0 0 8px #ffcc00; animation: floatUp 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; }
         @keyframes floatUp { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -120px) scale(1.3); opacity: 0; } }
     </style>
@@ -66,6 +65,12 @@
         <div class="key-row"><span>Right:</span><div class="key-btn" id="bind-right" onclick="rebind('right')">D</div></div>
         <button class="menu-btn back-btn" onclick="openScreen('main-menu')">Back</button>
     </div>
+    <div id="pause-menu" class="ui-screen">
+        <h2>Game Paused</h2>
+        <button class="menu-btn" onclick="togglePause()">Resume</button>
+        <button class="menu-btn" onclick="openSettingsFromPause()">Settings</button>
+        <button class="menu-btn back-btn" onclick="quitGame()">Quit Game</button>
+    </div>
     <div id="gameover-menu" class="ui-screen" style="display:none; background: rgba(30,5,10,0.95);">
         <title-text style="color:#ff0055; font-size:70px;">WRECKED!</title-text>
         <p style="font-size: 26px;">Score Multiplier Gained Coins: <span id="go-coins" style="color:#ffcc00">0</span></p>
@@ -80,7 +85,6 @@
 
     <script src="https://cloudflare.com"></script>
     <script>
-        // Intro addictive splash sequence 
         setTimeout(() => {
             document.getElementById('splash-title').style.transform = "scale(1.4)";
             document.getElementById('splash-title').style.transition = "transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)";
@@ -94,10 +98,17 @@
             }, 1000);
         }, 1500);
 
+        let previousScreen = 'main-menu';
         function openScreen(screenId) {
             document.querySelectorAll('.ui-screen').forEach(s => s.style.display = 'none');
             document.getElementById(screenId).style.display = 'flex';
             document.getElementById('shop-coins').innerText = saveState.coins;
+            if(screenId !== 'settings-menu') previousScreen = screenId;
+        }
+        function openSettingsFromPause() {
+            document.getElementById('pause-menu').style.display = 'none';
+            document.getElementById('settings-menu').style.display = 'flex';
+            previousScreen = 'pause-menu';
         }
 
         let saveState = { coins: 0, unlockedTruck: false, hasShield: false, activeCar: 'default' };
@@ -122,11 +133,29 @@
             }
         }
 
+        function generateCarbonTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#15151c'; ctx.fillRect(0, 0, 16, 16);
+            ctx.fillStyle = '#22222a'; ctx.fillRect(0, 0, 8, 8); ctx.fillRect(8, 8, 8, 8);
+            const texture = new THREE.CanvasTexture(canvas); texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(4, 4);
+            return texture;
+        }
+        function generateCamoTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2d5a27'; ctx.fillRect(0, 0, 64, 64);
+            ctx.fillStyle = '#1b3617'; ctx.beginPath(); ctx.arc(20, 20, 15, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#4a3b2c'; ctx.beginPath(); ctx.arc(45, 40, 18, 0, Math.PI*2); ctx.fill();
+            const texture = new THREE.CanvasTexture(canvas); texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(1, 1);
+            return texture;
+        }
+
         let scene, camera, renderer, carGroup, isPlaying = false, isPaused = false;
         let coinsCount = 0, controlMultiplier = 1.0, trollTimer = 0, entities = [];
         let keys = { up: false, down: false, left: false, right: false };
         let carPhysics = { speed: 0, maxSpeed: 1.4, acceleration: 0.04, deceleration: 0.02, angle: 0, steeringSpeed: 0.05, shielded: false };
-        let shakeIntensity = 0, trackGrid;
+        let shakeIntensity = 0, trackGrid, terrainLeft, terrainRight;
 
         function initEngine() {
             if (renderer) return;
@@ -139,78 +168,66 @@
             container.appendChild(renderer.domElement);
             scene.add(new THREE.AmbientLight(0xffffff, 0.7));
             let sun = new THREE.DirectionalLight(0x00ffcc, 1.5); sun.position.set(20, 40, 20); scene.add(sun);
-            
-            // Cyber Grid track floor layout
             let track = new THREE.Mesh(new THREE.PlaneGeometry(60, 4000), new THREE.MeshStandardMaterial({ color: 0x0a0a12, roughness: 0.3 }));
             track.rotation.x = -Math.PI / 2; scene.add(track);
             trackGrid = new THREE.GridHelper(2000, 100, 0x00ffcc, 0x222233);
             trackGrid.position.y = 0.05; scene.add(trackGrid);
+
+            let terrainGeo = new THREE.PlaneGeometry(300, 4000, 10, 10);
+            let terrainMat = new THREE.MeshStandardMaterial({ color: 0x050510, wireframe: true, roughness: 0.9 });
+            terrainLeft = new THREE.Mesh(terrainGeo, terrainMat); terrainLeft.rotation.x = -Math.PI/2; terrainLeft.position.set(-180, 0, 0); scene.add(terrainLeft);
+            terrainRight = new THREE.Mesh(terrainGeo, terrainMat); terrainRight.rotation.x = -Math.PI/2; terrainRight.position.set(180, 0, 0); scene.add(terrainRight);
         }
         function spawnCarModel() {
             if (carGroup) scene.remove(carGroup);
             carGroup = new THREE.Group();
             let isTruck = saveState.activeCar === 'truck';
-            let body = new THREE.Mesh(
-                isTruck ? new THREE.BoxGeometry(3, 1.6, 5.5) : new THREE.BoxGeometry(2.1, 0.8, 4.2),
-                new THREE.MeshStandardMaterial({ color: isTruck ? 0xff0055 : 0x00ffcc, metalness: 0.9, roughness: 0.1 })
-            );
-            body.position.y = isTruck ? 0.9 : 0.4;
-            carGroup.add(body);
+            let selectedTexture = isTruck ? generateCamoTexture() : generateCarbonTexture();
+            let carMat = new THREE.MeshStandardMaterial({ map: selectedTexture, roughness: isTruck ? 0.6 : 0.1, metalness: isTruck ? 0.3 : 0.8 });
+            let body = new THREE.Mesh(isTruck ? new THREE.BoxGeometry(3, 1.6, 5.5) : new THREE.BoxGeometry(2.1, 0.8, 4.2), carMat);
+            body.position.y = isTruck ? 0.9 : 0.4; carGroup.add(body);
+
+            let wheelMat = new THREE.MeshStandardMaterial({ color: 0x111115, roughness: 0.9 });
+            let wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 12); wheelGeo.rotateZ(Math.PI/2);
+            let offsets = [[-1.2, 0.4, 1.3], [1.2, 0.4, 1.3], [-1.2, 0.4, -1.3], [1.2, 0.4, -1.3]];
+            offsets.forEach(o => {
+                let w = new THREE.Mesh(wheelGeo, wheelMat);
+                w.position.set(isTruck ? o[0]*1.2 : o[0], isTruck ? 0.5 : o[1], o[2]);
+                carGroup.add(w);
+            });
             scene.add(carGroup);
         }
 
         function triggerJuicyPopText(label) {
-            let el = document.createElement('div');
-            el.className = 'pop-text';
-            el.innerText = label;
-            el.style.left = (window.innerWidth / 2 + (Math.random() * 60 - 30)) + 'px';
-            el.style.top = (window.innerHeight / 2) + 'px';
-            document.body.appendChild(el);
-            setTimeout(() => el.remove(), 600);
-
-            // Pop scaling punch animation on HUD counter
-            let hud = document.getElementById('hud');
-            hud.style.transform = "scale(1.4)";
-            setTimeout(() => hud.style.transform = "scale(1)", 100);
+            let el = document.createElement('div'); el.className = 'pop-text'; el.innerText = label;
+            el.style.left = (window.innerWidth / 2 + (Math.random() * 60 - 30)) + 'px'; el.style.top = (window.innerHeight / 2) + 'px';
+            document.body.appendChild(el); setTimeout(() => el.remove(), 600);
+            let hud = document.getElementById('hud'); hud.style.transform = "scale(1.4)"; setTimeout(() => hud.style.transform = "scale(1)", 100);
         }
 
         function startGame() {
             document.querySelectorAll('.ui-screen').forEach(s => s.style.display = 'none');
-            document.getElementById('canvas-container').style.display = 'block';
-            document.getElementById('hud').style.display = 'block';
-            document.getElementById('pause-btn').style.display = 'flex';
-            document.getElementById('ability-indicator').style.display = saveState.hasShield ? 'block' : 'none';
+            document.getElementById('canvas-container').style.display = 'block'; document.getElementById('hud').style.display = 'block';
+            document.getElementById('pause-btn').style.display = 'flex'; document.getElementById('ability-indicator').style.display = saveState.hasShield ? 'block' : 'none';
             initEngine(); spawnCarModel();
             carGroup.position.set(0, 0, 0); carPhysics.speed = 0; carPhysics.angle = 0; carPhysics.shielded = false;
             coinsCount = 0; document.getElementById('hud-coins').innerText = "0";
-            entities.forEach(e => scene.remove(e.mesh)); entities = [];
-            isPlaying = true; isPaused = false;
+            entities.forEach(e => scene.remove(e.mesh)); entities = []; isPlaying = true; isPaused = false;
         }
 
-        function togglePause() { isPaused = !isPaused; document.getElementById('pause-btn').innerText = isPaused ? '▶' : '⏸'; }
-        
-        function gameOver() {
-            isPlaying = false; saveState.coins += coinsCount;
-            shakeIntensity = 0;
-            document.getElementById('canvas-container').style.display = 'none';
-            document.getElementById('hud').style.display = 'none';
-            document.getElementById('pause-btn').style.display = 'none';
-            document.getElementById('troll-warning').style.display = 'none';
-            document.getElementById('ability-indicator').style.display = 'none';
-            document.getElementById('go-coins').innerText = coinsCount;
-            document.getElementById('gameover-menu').style.display = 'flex';
-        }
+        function togglePause() { if(!isPlaying) return; isPaused = !isPaused; document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none'; }
+        function quitGame() { isPlaying = false; isPaused = false; document.getElementById('pause-menu').style.display = 'none'; document.getElementById('canvas-container').style.display = 'none'; document.getElementById('hud').style.display = 'none'; document.getElementById('pause-btn').style.display = 'none'; openScreen('main-menu'); }
+        function gameOver() { isPlaying = false; saveState.coins += coinsCount; shakeIntensity = 0; document.getElementById('canvas-container').style.display = 'none'; document.getElementById('hud').style.display = 'none'; document.getElementById('pause-btn').style.display = 'none'; document.getElementById('troll-warning').style.display = 'none'; document.getElementById('ability-indicator').style.display = 'none'; document.getElementById('go-coins').innerText = coinsCount; document.getElementById('gameover-menu').style.display = 'flex'; }
 
         window.addEventListener('keydown', (e) => {
+            if(isPaused || !isPlaying) return;
             let k = e.key.toLowerCase();
             if (k === keybinds.up) keys.up = true; if (k === keybinds.down) keys.down = true;
             if (k === keybinds.left) keys.left = true; if (k === keybinds.right) keys.right = true;
             if (e.key === 'Shift' && saveState.hasShield && !carPhysics.shielded) {
-                saveState.hasShield = false; carPhysics.shielded = true;
-                document.getElementById('ability-indicator').style.display = 'none';
+                saveState.hasShield = false; carPhysics.shielded = true; document.getElementById('ability-indicator').style.display = 'none';
                 let shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(3.6, 12, 12), new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true }));
-                shieldMesh.name = "shieldVisual"; carGroup.add(shieldMesh);
-                shakeIntensity = 0.3; // Screen shock pop wave
+                shieldMesh.name = "shieldVisual"; carGroup.add(shieldMesh); shakeIntensity = 0.3;
             }
         });
         window.addEventListener('keyup', (e) => {
@@ -220,73 +237,39 @@
         });
 
         function animate() {
-            requestAnimationFrame(animate);
-            if (!isPlaying || isPaused) return;
+            requestAnimationFrame(animate); if (!isPlaying || isPaused) return;
             trollTimer++;
-            if (trollTimer % 300 === 0) {
-                controlMultiplier = Math.random() > 0.5 ? -1.0 : 1.0;
-                document.getElementById('troll-warning').style.display = controlMultiplier < 0 ? 'block' : 'none';
-                shakeIntensity = 0.4; // Screen rattle when glitch shifts up
-            }
+            if (trollTimer % 300 === 0) { controlMultiplier = Math.random() > 0.5 ? -1.0 : 1.0; document.getElementById('troll-warning').style.display = controlMultiplier < 0 ? 'block' : 'none'; shakeIntensity = 0.4; }
             if (keys.up) carPhysics.speed = Math.min(carPhysics.speed + carPhysics.acceleration, carPhysics.maxSpeed);
             else if (keys.down) carPhysics.speed = Math.max(carPhysics.speed - carPhysics.acceleration, -carPhysics.maxSpeed / 2);
             else carPhysics.speed *= 0.95;
             if (keys.left) carPhysics.angle += carPhysics.steeringSpeed * controlMultiplier;
             if (keys.right) carPhysics.angle -= carPhysics.steeringSpeed * controlMultiplier;
             
-            carGroup.position.x += Math.sin(carPhysics.angle) * carPhysics.speed;
-            carGroup.position.z -= Math.cos(carPhysics.angle) * carPhysics.speed;
-            carGroup.rotation.y = carPhysics.angle;
-            if (carGroup.position.x > 27) { carGroup.position.x = 27; shakeIntensity = 0.1; } 
-            if (carGroup.position.x < -27) { carGroup.position.x = -27; shakeIntensity = 0.1; }
-
-            // Dynamic grid colors matching speed hype
-            if(trackGrid) trackGrid.material.color.setHex(carPhysics.speed > 1.1 ? 0xff00ff : 0x00ffcc);
+            carGroup.position.x += Math.sin(carPhysics.angle) * carPhysics.speed; carGroup.position.z -= Math.cos(carPhysics.angle) * carPhysics.speed; carGroup.rotation.y = carPhysics.angle;
+            if (carGroup.position.x > 27) { carGroup.position.x = 27; shakeIntensity = 0.1; } if (carGroup.position.x < -27) { carGroup.position.x = -27; shakeIntensity = 0.1; }
+            if(trackGrid) { trackGrid.material.color.setHex(carPhysics.speed > 1.1 ? 0xff00ff : 0x00ffcc); trackGrid.position.z = (carGroup.position.z % 40); }
+            if(terrainLeft) terrainLeft.position.z = carGroup.position.z; if(terrainRight) terrainRight.position.z = carGroup.position.z;
 
             if (Math.random() < 0.05) {
                 let isCoin = Math.random() > 0.35;
-                let mesh = new THREE.Mesh(
-                    isCoin ? new THREE.CylinderGeometry(0.8, 0.8, 0.3, 8) : new THREE.BoxGeometry(3.6, 2, 6),
-                    new THREE.MeshStandardMaterial({ color: isCoin ? 0xffcc00 : 0xff2255, metalness: 0.5 })
-                );
-                if(isCoin) mesh.rotation.x = Math.PI/2;
-                mesh.position.set((Math.random() - 0.5) * 52, 1, carGroup.position.z - 240);
+                let mesh = new THREE.Mesh(isCoin ? new THREE.CylinderGeometry(0.8, 0.8, 0.3, 8) : new THREE.BoxGeometry(3.6, 2, 6), new THREE.MeshStandardMaterial({ color: isCoin ? 0xffcc00 : 0xff2255, metalness: 0.5 }));
+                if(isCoin) mesh.rotation.x = Math.PI/2; mesh.position.set((Math.random() - 0.5) * 52, 1, carGroup.position.z - 240);
                 scene.add(mesh); entities.push({ mesh: mesh, isCoin: isCoin });
             }
 
             for (let i = entities.length - 1; i >= 0; i--) {
-                let ent = entities[i];
-                if (!ent.isCoin) ent.mesh.position.z += 0.5; // High speed car traffic flow
-                else ent.mesh.rotation.y += 0.05; // Spin individual collectible coins smoothly
-
+                let ent = entities[i]; if (!ent.isCoin) ent.mesh.position.z += 0.5; else ent.mesh.rotation.y += 0.05;
                 if (carGroup.position.distanceTo(ent.mesh.position) < 3.4) {
                     scene.remove(ent.mesh); entities.splice(i, 1);
-                    if (ent.isCoin) { 
-                        coinsCount++; 
-                        document.getElementById('hud-coins').innerText = coinsCount;
-                        triggerJuicyPopText("+1 COIN!");
-                        shakeIntensity = 0.15;
-                    } 
-                    else {
-                        if (carPhysics.shielded) {
-                            carPhysics.shielded = false;
-                            shakeIntensity = 0.8;
-                            let v = carGroup.getObjectByName("shieldVisual"); if(v) carGroup.remove(v);
-                            triggerJuicyPopText("SHIELD BROKEN!");
-                        } else { gameOver(); }
-                    }
+                    if (ent.isCoin) { coinsCount++; document.getElementById('hud-coins').innerText = coinsCount; triggerJuicyPopText("+1 COIN!"); shakeIntensity = 0.15; } 
+                    else { if (carPhysics.shielded) { carPhysics.shielded = false; shakeIntensity = 0.8; let v = carGroup.getObjectByName("shieldVisual"); if(v) carGroup.remove(v); triggerJuicyPopText("SHIELD BROKEN!"); } else { gameOver(); } }
                     continue;
                 }
                 if (ent.mesh.position.z > carGroup.position.z + 40) { scene.remove(ent.mesh); entities.splice(i, 1); }
             }
-
-            // High juice screen camera vibration formulas
-            let shakeX = (Math.random() - 0.5) * shakeIntensity;
-            let shakeY = (Math.random() - 0.5) * shakeIntensity;
-            shakeIntensity *= 0.9; // Smoothly damp out camera vibrations
-
-            camera.position.set(carGroup.position.x + shakeX, carGroup.position.y + 5.2 + shakeY, carGroup.position.z + 14);
-            camera.lookAt(carGroup.position.x, carGroup.position.y + 0.5, carGroup.position.z - 5);
+            let shakeX = (Math.random() - 0.5) * shakeIntensity; let shakeY = (Math.random() - 0.5) * shakeIntensity; shakeIntensity *= 0.9;
+            camera.position.set(carGroup.position.x + shakeX, carGroup.position.y + 5.2 + shakeY, carGroup.position.z + 14); camera.lookAt(carGroup.position.x, carGroup.position.y + 0.5, carGroup.position.z - 5);
             renderer.render(scene, camera);
         }
         setInterval(animate, 1000 / 60);
